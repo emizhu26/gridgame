@@ -1,7 +1,7 @@
 const STARTING_FOSSIL = 4;
 const RENEWABLE_COST = 24;
-const POST_TRANSITION_ROUNDS = 2;
-const STARTING_MONEY = 12;
+const POST_TRANSITION_ROUNDS = 3;
+const STARTING_MONEY = 0;
 
 const state = {
   round: 1,
