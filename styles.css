@@ -23,6 +23,23 @@ body {
   margin-top: 8px;
 }
 
+.fossil-strip {
+  margin-top: 18px;
+}
+
+.fossil-icons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.fossil-icon {
+  width: 200px;
+  height: 200px;
+  object-fit: contain;
+}
+
 .stats-grid {
   margin-top: 18px;
   display: grid;
