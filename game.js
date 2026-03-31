@@ -6,7 +6,7 @@ const STARTING_MONEY = 0;
 const state = {
   round: 1,
   money: STARTING_MONEY,
-  fossilPlants: STARTING_FOSSIL,
+  Plants: STARTING_FOSSIL,
   renewables: 0,
   postTransitionRoundsSurvived: 0,
   gameOver: false,
