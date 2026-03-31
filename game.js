@@ -6,7 +6,7 @@ const STARTING_MONEY = 0;
 const state = {
   round: 1,
   money: STARTING_MONEY,
-  Plants: STARTING_FOSSIL,
+  fossilPlants: STARTING_FOSSIL,
   renewables: 0,
   postTransitionRoundsSurvived: 0,
   gameOver: false,
@@ -23,6 +23,7 @@ const els = {
   roundValue: document.getElementById("roundValue"),
   moneyValue: document.getElementById("moneyValue"),
   fossilValue: document.getElementById("fossilValue"),
+  fossilIcons: document.getElementById("fossilIcons"),
   renewableValue: document.getElementById("renewableValue"),
   demandValue: document.getElementById("demandValue"),
   renewableOutputValue: document.getElementById("renewableOutputValue"),
@@ -89,6 +90,18 @@ function updateButtons() {
   els.playRoundButton.disabled = state.gameOver;
 }
 
+function renderFossilIcons() {
+  els.fossilIcons.innerHTML = "";
+
+  for (let i = 0; i < state.fossilPlants; i += 1) {
+    const icon = document.createElement("img");
+    icon.src = "./src/img/fossil_fuel.png";
+    icon.alt = "Fossil fuel plant";
+    icon.className = "fossil-icon";
+    els.fossilIcons.append(icon);
+  }
+}
+
 function render() {
   const { demand, renewableOutput, fossilUsed, income } = state.lastRound;
 
@@ -102,6 +115,7 @@ function render() {
   els.fossilUsedValue.textContent = fossilUsed === null ? "-" : String(fossilUsed);
   els.incomeValue.textContent = income === null ? "-" : String(income);
 
+  renderFossilIcons();
   updateButtons();
 }
 
