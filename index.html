@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Renewable Grid Game</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="app-header">
+        <h1>Renewable Grid Game</h1>
+        <p>
+          Replace all fossil plants with renewables, then survive 2 more rounds
+          without blackouts.
+        </p>
+      </header>
+
+      <section class="stats-grid" aria-label="Game stats">
+        <article class="card"><h2>Round</h2><p id="roundValue">1</p></article>
+        <article class="card"><h2>Money</h2><p id="moneyValue">0</p></article>
+        <article class="card"><h2>Fossil Plants</h2><p id="fossilValue">4</p></article>
+        <article class="card"><h2>Renewables</h2><p id="renewableValue">0</p></article>
+        <article class="card"><h2>Demand</h2><p id="demandValue">-</p></article>
+        <article class="card"><h2>Renewable Output</h2><p id="renewableOutputValue">-</p></article>
+        <article class="card"><h2>Fossil Used</h2><p id="fossilUsedValue">-</p></article>
+        <article class="card"><h2>Net Income</h2><p id="incomeValue">-</p></article>
+      </section>
+
+      <section class="controls">
+        <button id="playRoundButton">Play Round</button>
+        <button id="buyButton">Buy Renewable (24)</button>
+        <button id="restartButton" class="secondary">Restart</button>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <h2>Educational Tip</h2>
+          <p id="tipText">
+            Renewable output changes each round, so planning reserves is key for
+            reliability.
+          </p>
+          <p id="statusText" class="status">Game ready. Press Play Round.</p>
+        </article>
+
+        <article class="panel">
+          <h2>Rules Snapshot</h2>
+          <ul>
+            <li>Demand each round: roll 1-16.</li>
+            <li>Each renewable generates 1-4 power.</li>
+            <li>Fossil fallback cost: ceil(fossil used / 2).</li>
+            <li>Income: demand - fossil cost.</li>
+            <li>Each renewable purchase costs 24 and replaces 1 fossil.</li>
+            <li>You lose instantly if demand cannot be met.</li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="panel">
+        <h2>Round Log</h2>
+        <ol id="logList" class="log-list"></ol>
+      </section>
+    </main>
+
+    <script src="./game.js"></script>
+  </body>
+</html>

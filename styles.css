@@ -1,0 +1,106 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: #102a43;
+  background: #f4f9f7;
+}
+
+.app {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.app-header h1 {
+  margin: 0;
+}
+
+.app-header p {
+  margin-top: 8px;
+}
+
+.stats-grid {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.card,
+.panel {
+  background: #ffffff;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.card h2,
+.panel h2 {
+  font-size: 14px;
+  margin: 0 0 6px;
+  color: #334e68;
+}
+
+.card p {
+  margin: 0;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+button {
+  border: none;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  background: #2f855a;
+  color: #fff;
+}
+
+button.secondary {
+  background: #486581;
+}
+
+button:disabled {
+  background: #9fb3c8;
+  cursor: not-allowed;
+}
+
+.two-column {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.status {
+  margin-top: 12px;
+  font-weight: bold;
+}
+
+.log-list {
+  margin: 0;
+  padding-left: 20px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.log-list li {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 780px) {
+  .two-column {
+    grid-template-columns: 1fr;
+  }
+}
