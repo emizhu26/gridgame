@@ -34,6 +34,30 @@ body {
   flex-wrap: wrap;
 }
 
+.round-summary {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.round-demand-announcement {
+  min-height: 1.6em;
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #102a43;
+}
+
+.round-breakdown {
+  min-height: 3.6em;
+  margin: 10px auto 0;
+  max-width: 720px;
+  font-size: 18px;
+  line-height: 1.5;
+  color: #334e68;
+  white-space: pre-line;
+}
+
 .fossil-icon {
   width: 200px;
   height: 200px;
@@ -119,5 +143,13 @@ button:disabled {
 @media (max-width: 780px) {
   .two-column {
     grid-template-columns: 1fr;
+  }
+
+  .round-demand-announcement {
+    font-size: 24px;
+  }
+
+  .round-breakdown {
+    font-size: 16px;
   }
 }

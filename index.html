@@ -11,7 +11,7 @@
       <header class="app-header">
         <h1>Renewable Grid Game</h1>
         <p>
-          Replace all fossil plants with renewables, then survive 3 more rounds
+          Replace all fossil plants with renewables, then survive 2 more rounds
           without blackouts.
         </p>
       </header>
@@ -19,6 +19,10 @@
       <section class="fossil-strip panel" aria-label="Remaining fossil plants">
         <article class = "card"> <h2>Remaining Fossil Plants</h2><p id="fossilValue">4</p></article>
         <div id="fossilIcons" class="fossil-icons"></div>
+        <div class="round-summary" aria-live="polite">
+          <p id="roundDemandAnnouncement" class="round-demand-announcement"></p>
+          <p id="roundBreakdown" class="round-breakdown"></p>
+        </div>
       </section>
 
       <section class="stats-grid" aria-label="Game stats">
@@ -52,10 +56,11 @@
           <ul>
             <li>Demand each round: roll 1-16.</li>
             <li>Each renewable generates 1-4 power.</li>
+            <li>Any remaining fossil plant can cover unmet demand in that round.</li>
             <li>Fossil fallback cost: ceil(fossil used / 2).</li>
             <li>Income: demand - fossil cost.</li>
             <li>Each renewable purchase costs 24 and replaces 1 fossil.</li>
-            <li>You lose instantly if demand cannot be met.</li>
+            <li>You only blackout if renewables fall short after all fossil plants are gone.</li>
           </ul>
         </article>
       </section>
