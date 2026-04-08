@@ -1,17 +1,25 @@
 const STARTING_FOSSIL = 4;
 const RENEWABLE_COST = 24;
-const POST_TRANSITION_ROUNDS = 3;
+const POST_TRANSITION_ROUNDS = 2;
 const STARTING_MONEY = 0;
 
 const state = {
   round: 1,
   money: STARTING_MONEY,
+  displayedMoney: STARTING_MONEY,
   fossilPlants: STARTING_FOSSIL,
   renewables: 0,
   postTransitionRoundsSurvived: 0,
+  isResolvingRound: false,
   gameOver: false,
   won: false,
   lastRound: {
+    demand: null,
+    renewableOutput: null,
+    fossilUsed: null,
+    income: null
+  },
+  displayedRound: {
     demand: null,
     renewableOutput: null,
     fossilUsed: null,
@@ -24,6 +32,8 @@ const els = {
   moneyValue: document.getElementById("moneyValue"),
   fossilValue: document.getElementById("fossilValue"),
   fossilIcons: document.getElementById("fossilIcons"),
+  roundDemandAnnouncement: document.getElementById("roundDemandAnnouncement"),
+  roundBreakdown: document.getElementById("roundBreakdown"),
   renewableValue: document.getElementById("renewableValue"),
   demandValue: document.getElementById("demandValue"),
   renewableOutputValue: document.getElementById("renewableOutputValue"),
@@ -36,6 +46,10 @@ const els = {
   buyButton: document.getElementById("buyButton"),
   restartButton: document.getElementById("restartButton")
 };
+
+const REVEAL_DELAY = 1400;
+let pendingRoundTimeoutId = null;
+let pendingBreakdownTimeoutIds = [];
 
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -86,8 +100,12 @@ function getTip({ demand, renewableOutput, fossilUsed, income, boughtThisTurn })
 
 function updateButtons() {
   els.buyButton.disabled =
-    state.gameOver || state.money < RENEWABLE_COST || state.fossilPlants <= 0;
-  els.playRoundButton.disabled = state.gameOver;
+    state.gameOver ||
+    state.isResolvingRound ||
+    state.money < RENEWABLE_COST ||
+    state.fossilPlants <= 0;
+  els.playRoundButton.disabled = state.gameOver || state.isResolvingRound;
+  els.restartButton.disabled = state.isResolvingRound;
 }
 
 function renderFossilIcons() {
@@ -103,10 +121,10 @@ function renderFossilIcons() {
 }
 
 function render() {
-  const { demand, renewableOutput, fossilUsed, income } = state.lastRound;
+  const { demand, renewableOutput, fossilUsed, income } = state.displayedRound;
 
   els.roundValue.textContent = String(state.round);
-  els.moneyValue.textContent = String(state.money);
+  els.moneyValue.textContent = String(state.displayedMoney);
   els.fossilValue.textContent = String(state.fossilPlants);
   els.renewableValue.textContent = String(state.renewables);
   els.demandValue.textContent = demand === null ? "-" : String(demand);
@@ -117,6 +135,49 @@ function render() {
 
   renderFossilIcons();
   updateButtons();
+}
+
+function setRoundDemandAnnouncement(message = "") {
+  els.roundDemandAnnouncement.textContent = message;
+}
+
+function setDisplayedRoundValues(roundValues = {}, displayedMoney = state.displayedMoney) {
+  state.displayedRound = {
+    ...state.displayedRound,
+    ...roundValues
+  };
+  state.displayedMoney = displayedMoney;
+  render();
+}
+
+function clearRoundBreakdownReveal() {
+  pendingBreakdownTimeoutIds.forEach((timeoutId) => {
+    window.clearTimeout(timeoutId);
+  });
+  pendingBreakdownTimeoutIds = [];
+}
+
+function setRoundBreakdown(steps = []) {
+  clearRoundBreakdownReveal();
+  els.roundBreakdown.textContent = "";
+
+  if (!Array.isArray(steps) || steps.length === 0) {
+    return;
+  }
+
+  steps.forEach((step, index) => {
+    const timeoutId = window.setTimeout(() => {
+      step.onReveal?.();
+
+      if (index === 0) {
+        els.roundBreakdown.textContent = step.text;
+      } else {
+        els.roundBreakdown.textContent += `\n${step.text}`;
+      }
+    }, index * REVEAL_DELAY);
+
+    pendingBreakdownTimeoutIds.push(timeoutId);
+  });
 }
 
 function checkWinProgress() {
@@ -137,35 +198,77 @@ function checkWinProgress() {
   }
 }
 
-function playRound() {
-  if (state.gameOver) {
-    return;
-  }
-
-  const demand = rollDemand();
+function resolveRound(demand) {
+  const moneyBeforeRound = state.money;
   const renewableOutput = rollRenewableOutput(state.renewables);
-  const fossilCapacity = state.fossilPlants * 4;
   const shortfall = Math.max(0, demand - renewableOutput);
+  const renewableUsed = Math.min(demand, renewableOutput);
 
-  if (shortfall > fossilCapacity) {
+  if (shortfall > 0 && state.fossilPlants === 0) {
     state.lastRound = {
       demand,
       renewableOutput,
-      fossilUsed: fossilCapacity,
+      fossilUsed: 0,
       income: 0
     };
     state.gameOver = true;
     state.won = false;
+    setRoundDemandAnnouncement(`Your energy demand for the round is ${demand}.`);
+    setRoundBreakdown([
+      {
+        text: `Renewables covered ${renewableUsed} units of energy.`,
+        onReveal: () => {
+          setDisplayedRoundValues(
+            {
+              demand,
+              renewableOutput,
+              fossilUsed: null,
+              income: null
+            },
+            moneyBeforeRound
+          );
+        }
+      },
+      {
+        text: "Fossil fuels covered 0 units because you have none left.",
+        onReveal: () => {
+          setDisplayedRoundValues(
+            {
+              demand,
+              renewableOutput,
+              fossilUsed: 0,
+              income: null
+            },
+            moneyBeforeRound
+          );
+        }
+      },
+      {
+        text: "Overall, you added 0 money this round and blacked out.",
+        onReveal: () => {
+          state.isResolvingRound = false;
+          setDisplayedRoundValues(
+            {
+              demand,
+              renewableOutput,
+              fossilUsed: 0,
+              income: 0
+            },
+            moneyBeforeRound
+          );
+        }
+      }
+    ]);
     els.statusText.textContent = "Blackout: demand exceeded your available supply.";
     els.tipText.textContent = getTip({
       demand,
       renewableOutput,
-      fossilUsed: fossilCapacity,
+      fossilUsed: 0,
       income: 0,
       boughtThisTurn: false
     });
     addLog(
-      `Round ${state.round}: Demand ${demand}, renewables ${renewableOutput}, max fossil ${fossilCapacity}. Blackout occurred.`
+      `Round ${state.round}: Demand ${demand}, renewables ${renewableOutput}. Blackout occurred.`
     );
     render();
     return;
@@ -175,6 +278,53 @@ function playRound() {
   const fossilCost = Math.ceil(fossilUsed / 2);
   const income = demand - fossilCost;
   state.money += income;
+  setRoundDemandAnnouncement(`Your energy demand for the round is ${demand}.`);
+  setRoundBreakdown([
+    {
+      text: `Renewables accounted for ${renewableUsed} units of energy.`,
+      onReveal: () => {
+        setDisplayedRoundValues(
+          {
+            demand,
+            renewableOutput,
+            fossilUsed: null,
+            income: null
+          },
+          moneyBeforeRound
+        );
+      }
+    },
+    {
+      text: `Fossil fuels covered ${fossilUsed} units of energy at a cost of ${fossilCost} money units.`,
+      onReveal: () => {
+        setDisplayedRoundValues(
+          {
+            demand,
+            renewableOutput,
+            fossilUsed,
+            income: null
+          },
+          moneyBeforeRound
+        );
+      }
+    },
+    {
+      text: `Overall, you added ${income} money units this round.`,
+      onReveal: () => {
+        state.round += 1;
+        state.isResolvingRound = false;
+        setDisplayedRoundValues(
+          {
+            demand,
+            renewableOutput,
+            fossilUsed,
+            income
+          },
+          state.money
+        );
+      }
+    }
+  ]);
 
   state.lastRound = {
     demand,
@@ -196,14 +346,39 @@ function playRound() {
     income,
     boughtThisTurn: false
   });
-
-  state.round += 1;
   render();
+}
+
+function playRound() {
+  if (state.gameOver || state.isResolvingRound) {
+    return;
+  }
+
+  const demand = rollDemand();
+  state.isResolvingRound = true;
+  setRoundDemandAnnouncement(`Your energy demand for the round is ${demand}.`);
+  setDisplayedRoundValues(
+    {
+      demand,
+      renewableOutput: null,
+      fossilUsed: null,
+      income: null
+    },
+    state.money
+  );
+  setRoundBreakdown([{ text: "Rolling renewable output and fossil cost..." }]);
+  render();
+
+  pendingRoundTimeoutId = window.setTimeout(() => {
+    pendingRoundTimeoutId = null;
+    resolveRound(demand);
+  }, REVEAL_DELAY);
 }
 
 function buyRenewable() {
   if (
     state.gameOver ||
+    state.isResolvingRound ||
     state.money < RENEWABLE_COST ||
     state.fossilPlants <= 0
   ) {
@@ -211,12 +386,15 @@ function buyRenewable() {
   }
 
   state.money -= RENEWABLE_COST;
+  state.displayedMoney = state.money;
   state.fossilPlants -= 1;
   state.renewables += 1;
 
   addLog(
     `Investment: Bought 1 renewable for ${RENEWABLE_COST}. Fossil plants now ${state.fossilPlants}.`
   );
+  setRoundDemandAnnouncement("");
+  setRoundBreakdown([]);
   els.statusText.textContent = "Purchased 1 renewable source and retired 1 fossil plant.";
   els.tipText.textContent = getTip({
     demand: state.lastRound.demand ?? 0,
@@ -229,11 +407,19 @@ function buyRenewable() {
 }
 
 function restartGame() {
+  if (pendingRoundTimeoutId !== null) {
+    window.clearTimeout(pendingRoundTimeoutId);
+    pendingRoundTimeoutId = null;
+  }
+  clearRoundBreakdownReveal();
+
   state.round = 1;
   state.money = STARTING_MONEY;
+  state.displayedMoney = STARTING_MONEY;
   state.fossilPlants = STARTING_FOSSIL;
   state.renewables = 0;
   state.postTransitionRoundsSurvived = 0;
+  state.isResolvingRound = false;
   state.gameOver = false;
   state.won = false;
   state.lastRound = {
@@ -242,8 +428,16 @@ function restartGame() {
     fossilUsed: null,
     income: null
   };
+  state.displayedRound = {
+    demand: null,
+    renewableOutput: null,
+    fossilUsed: null,
+    income: null
+  };
 
   els.logList.innerHTML = "";
+  setRoundDemandAnnouncement("");
+  setRoundBreakdown([]);
   els.statusText.textContent = "Game reset. Press Play Round to start.";
   els.tipText.textContent =
     "Renewable output changes each round, so planning reserves is key for reliability.";
