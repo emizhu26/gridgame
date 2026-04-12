@@ -1,7 +1,7 @@
 const STARTING_FOSSIL = 4;
 const RENEWABLE_COST = 24;
 const POST_TRANSITION_ROUNDS = 2;
-const STARTING_MONEY = 200;
+const STARTING_MONEY = 0;
 
 const state = {
   round: 1,
@@ -145,11 +145,9 @@ function renderFossilIcons() {
     const icon4 = windIcon();
     els.fossilIcons.append(icon4);
     const icon3 = solarIcon();
-    els.fossilIcons.append(icon3);
-   
-    
-}
-}
+    els.fossilIcons.append(icon3);   
+    }
+  }
 }
 
 function solarIcon(){
