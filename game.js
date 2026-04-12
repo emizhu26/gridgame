@@ -118,7 +118,54 @@ function renderFossilIcons() {
     icon.className = "fossil-icon";
     els.fossilIcons.append(icon);
   }
+  if(state.renewables != 0){
+    if (state.renewables == 1) {
+    const icon = solarIcon();
+    els.fossilIcons.append(icon);
+  }
+    if(state.renewables == 2) {
+    const icon2 = windIcon();
+    els.fossilIcons.append(icon2);
+    const icon1 = solarIcon();
+    els.fossilIcons.append(icon1);
+  }
+    if(state.renewables == 3) {
+    const icon1 = solarIcon();
+    els.fossilIcons.append(icon1);
+    const icon2 = windIcon();
+    els.fossilIcons.append(icon2);
+    const icon3 = solarIcon();
+    els.fossilIcons.append(icon3);
+  }
+  if(state.renewables == 4) {
+    const icon2 = windIcon();
+    els.fossilIcons.append(icon2);
+    const icon1 = solarIcon();
+    els.fossilIcons.append(icon1);
+    const icon4 = windIcon();
+    els.fossilIcons.append(icon4);
+    const icon3 = solarIcon();
+    els.fossilIcons.append(icon3);   
+    }
+  }
 }
+
+function solarIcon(){
+  const icon = document.createElement("img");
+  icon.src = "./src/img/renewables.png";
+  icon.alt = "Renewable energy source";
+  icon.className = "fossil-icon"
+  return icon; 
+}
+
+function windIcon(){
+  const icon = document.createElement("img");
+    icon.src = "./src/img/wind_renewable.jpeg";
+    icon.alt = "Renewable energy source";
+    icon.className = "fossil-icon";
+    return icon;
+}
+
 
 function render() {
   const { demand, renewableOutput, fossilUsed, income } = state.displayedRound;
