@@ -1,7 +1,7 @@
 const STARTING_FOSSIL = 4;
 const RENEWABLE_COST = 24;
-const POST_TRANSITION_ROUNDS = 2;
-const STARTING_MONEY = 0;
+const POST_TRANSITION_ROUNDS = 4;
+const STARTING_MONEY = 12;
 
 const state = {
   round: 1,
@@ -24,7 +24,11 @@ const state = {
     renewableOutput: null,
     fossilUsed: null,
     income: null
-  }
+  },
+  marketSellPrice: randInt(1, 2),
+  marketBuyPrice: randInt(3, 5),
+  marketEnergy: 0,
+  sellableSurplus: 0
 };
 
 const els = {
@@ -44,13 +48,20 @@ const els = {
   logList: document.getElementById("logList"),
   playRoundButton: document.getElementById("playRoundButton"),
   buyButton: document.getElementById("buyButton"),
+  marketButton: document.getElementById("marketButton"),
   restartButton: document.getElementById("restartButton"),
   openRulesButton: document.getElementById("openRulesButton"),
   openLogButton: document.getElementById("openLogButton"),
+  closeMarketButton: document.getElementById("closeMarketButton"),
   closeRulesButton: document.getElementById("closeRulesButton"),
   closeLogButton: document.getElementById("closeLogButton"),
   rulesModal: document.getElementById("rulesModal"),
-  logModal: document.getElementById("logModal")
+  logModal: document.getElementById("logModal"),
+  marketModal: document.getElementById("marketModal"),
+  marketPricesText: document.getElementById("marketPricesText"),
+  marketInventoryText: document.getElementById("marketInventoryText"),
+  sellEnergyButton: document.getElementById("sellEnergyButton"),
+  buyEnergyButton: document.getElementById("buyEnergyButton")
 };
 
 const REVEAL_DELAY = 1400;
@@ -86,6 +97,27 @@ function closeModal(modalEl) {
 function closeAllModals() {
   closeModal(els.rulesModal);
   closeModal(els.logModal);
+  closeModal(els.marketModal);
+}
+
+function rerollMarketPrices() {
+  state.marketSellPrice = randInt(1, 2);
+  state.marketBuyPrice = randInt(3, 5);
+}
+
+function updateMarketUi() {
+  if (els.marketPricesText) {
+    els.marketPricesText.textContent = `Round ${state.round} prices — Sell: ${state.marketSellPrice}/unit, Buy: ${state.marketBuyPrice}/unit.`;
+  }
+  if (els.marketInventoryText) {
+    els.marketInventoryText.textContent = `Stored energy: ${state.marketEnergy}. Sellable renewable surplus: ${state.sellableSurplus}.`;
+  }
+  if (els.sellEnergyButton) {
+    els.sellEnergyButton.disabled = state.sellableSurplus <= 0 || state.gameOver;
+  }
+  if (els.buyEnergyButton) {
+    els.buyEnergyButton.disabled = state.money < state.marketBuyPrice || state.gameOver;
+  }
 }
 
 function addLog(message) {
@@ -155,6 +187,9 @@ function updateButtons() {
     state.fossilPlants <= 0;
   els.playRoundButton.disabled = state.gameOver || state.isResolvingRound;
   els.restartButton.disabled = state.isResolvingRound;
+  if (els.marketButton) {
+    els.marketButton.disabled = state.gameOver;
+  }
 }
 
 function renderFossilIcons() {
@@ -231,6 +266,7 @@ function render() {
 
   renderFossilIcons();
   updateButtons();
+  updateMarketUi();
 }
 
 function setRoundDemandAnnouncement(message = "") {
@@ -328,8 +364,12 @@ function checkWinProgress() {
 function resolveRound(demand) {
   const moneyBeforeRound = state.money;
   const renewableOutput = rollRenewableOutput(state.renewables);
-  const shortfall = Math.max(0, demand - renewableOutput);
+  const shortfallAfterRenewables = Math.max(0, demand - renewableOutput);
+  const marketUsed = Math.min(state.marketEnergy, shortfallAfterRenewables);
+  state.marketEnergy -= marketUsed;
+  const shortfall = Math.max(0, shortfallAfterRenewables - marketUsed);
   const renewableUsed = Math.min(demand, renewableOutput);
+  state.sellableSurplus = Math.max(0, renewableOutput - demand);
 
   if (shortfall > 0 && state.fossilPlants === 0) {
     state.lastRound = {
@@ -357,7 +397,10 @@ function resolveRound(demand) {
         }
       },
       {
-        text: "Fossil fuels covered 0 units because you have none left.",
+        text:
+          marketUsed > 0
+            ? `Market energy covered ${marketUsed} units. Fossil fuels covered 0 units because you have none left.`
+            : "Fossil fuels covered 0 units because you have none left.",
         onReveal: () => {
           setDisplayedRoundValues(
             {
@@ -422,7 +465,10 @@ function resolveRound(demand) {
       }
     },
     {
-      text: `Fossil fuels covered ${fossilUsed} units of energy at a cost of ${fossilCost} money units.`,
+      text:
+        marketUsed > 0
+          ? `Stored market energy covered ${marketUsed} units. Fossil fuels covered ${fossilUsed} units of energy at a cost of ${fossilCost} money units.`
+          : `Fossil fuels covered ${fossilUsed} units of energy at a cost of ${fossilCost} money units.`,
       onReveal: () => {
         setDisplayedRoundValues(
           {
@@ -461,7 +507,7 @@ function resolveRound(demand) {
   };
 
   addLog(
-    `Round ${state.round}: Demand ${demand}, renewables ${renewableOutput}, fossil used ${fossilUsed}, income +${income}.`
+    `Round ${state.round}: Demand ${demand}, renewables ${renewableOutput}, market used ${marketUsed}, fossil used ${fossilUsed}, income +${income}.`
   );
 
   els.statusText.textContent = "Round complete. You can buy a renewable before the next round.";
@@ -474,6 +520,8 @@ function resolveRound(demand) {
     boughtThisTurn: false
   });
   render();
+  rerollMarketPrices();
+  updateMarketUi();
 }
 
 function playRound() {
@@ -481,6 +529,7 @@ function playRound() {
     return;
   }
 
+  state.sellableSurplus = 0;
   const demand = rollDemand();
   state.isResolvingRound = true;
   setRoundDemandAnnouncement(`Your energy demand for the round is ${demand}.`);
@@ -536,6 +585,34 @@ function buyRenewable() {
   flashStatValue(els.renewableValue);
 }
 
+function sellSurplusEnergy() {
+  if (state.gameOver || state.sellableSurplus <= 0) {
+    return;
+  }
+  const unitsSold = state.sellableSurplus;
+  const revenue = unitsSold * state.marketSellPrice;
+  state.sellableSurplus = 0;
+  state.money += revenue;
+  state.displayedMoney = state.money;
+  addLog(`Market: Sold ${unitsSold} surplus renewable unit(s) for +${revenue}.`);
+  els.statusText.textContent = `Sold ${unitsSold} surplus energy unit(s) on the market.`;
+  render();
+  flashStatValue(els.moneyValue);
+}
+
+function buyMarketEnergy() {
+  if (state.gameOver || state.money < state.marketBuyPrice) {
+    return;
+  }
+  state.money -= state.marketBuyPrice;
+  state.displayedMoney = state.money;
+  state.marketEnergy += 1;
+  addLog(`Market: Bought 1 energy unit for ${state.marketBuyPrice}.`);
+  els.statusText.textContent = "Purchased 1 market energy unit.";
+  render();
+  flashStatValue(els.moneyValue);
+}
+
 function restartGame() {
   if (pendingRoundTimeoutId !== null) {
     window.clearTimeout(pendingRoundTimeoutId);
@@ -564,6 +641,9 @@ function restartGame() {
     fossilUsed: null,
     income: null
   };
+  state.marketEnergy = 0;
+  state.sellableSurplus = 0;
+  rerollMarketPrices();
 
   els.logList.innerHTML = "";
   setRoundDemandAnnouncement("");
@@ -576,7 +656,11 @@ function restartGame() {
 
 els.playRoundButton.addEventListener("click", playRound);
 els.buyButton.addEventListener("click", buyRenewable);
+els.marketButton?.addEventListener("click", () => openModal(els.marketModal));
 els.restartButton.addEventListener("click", restartGame);
+els.sellEnergyButton?.addEventListener("click", sellSurplusEnergy);
+els.buyEnergyButton?.addEventListener("click", buyMarketEnergy);
+els.closeMarketButton?.addEventListener("click", () => closeModal(els.marketModal));
 els.openRulesButton?.addEventListener("click", () => openModal(els.rulesModal));
 els.openLogButton?.addEventListener("click", () => openModal(els.logModal));
 els.closeRulesButton?.addEventListener("click", () => closeModal(els.rulesModal));
@@ -589,6 +673,11 @@ els.rulesModal?.addEventListener("click", (event) => {
 els.logModal?.addEventListener("click", (event) => {
   if (event.target === els.logModal) {
     closeModal(els.logModal);
+  }
+});
+els.marketModal?.addEventListener("click", (event) => {
+  if (event.target === els.marketModal) {
+    closeModal(els.marketModal);
   }
 });
 window.addEventListener("keydown", (event) => {

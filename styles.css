@@ -374,6 +374,18 @@ button:disabled {
   margin-top: 5px;
 }
 
+.market-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+#marketPricesText,
+#marketInventoryText {
+  margin: 4px 0;
+}
+
 @media (max-width: 980px) {
   .app {
     min-height: auto;

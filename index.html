@@ -31,7 +31,7 @@
         </div>
         <h1>Renewable Grid Game</h1>
         <p>
-          Replace all fossil plants with renewables, then survive 2 more rounds
+          Replace all fossil plants with renewables, then survive 4 more rounds
           without blackouts.
         </p>
       </header>
@@ -49,6 +49,7 @@
       <section class="controls">
         <button id="playRoundButton">Play Round</button>
         <button id="buyButton">Buy Renewable (24)</button>
+        <button id="marketButton">Market</button>
         <button id="restartButton" class="secondary">Restart</button>
       </section>
 
@@ -105,6 +106,21 @@
           <button id="closeLogButton" class="close-button secondary" type="button" aria-label="Close round log">&times;</button>
         </div>
         <ol id="logList" class="log-list"></ol>
+      </div>
+    </div>
+
+    <div id="marketModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="marketModalTitle">
+      <div class="modal-card panel">
+        <div class="modal-header">
+          <h2 id="marketModalTitle">Energy Market</h2>
+          <button id="closeMarketButton" class="close-button secondary" type="button" aria-label="Close market">&times;</button>
+        </div>
+        <p id="marketPricesText"></p>
+        <p id="marketInventoryText"></p>
+        <div class="market-actions">
+          <button id="sellEnergyButton" type="button">Sell Surplus</button>
+          <button id="buyEnergyButton" type="button">Buy 1 Energy</button>
+        </div>
       </div>
     </div>
 
