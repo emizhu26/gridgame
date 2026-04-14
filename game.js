@@ -44,12 +44,20 @@ const els = {
   logList: document.getElementById("logList"),
   playRoundButton: document.getElementById("playRoundButton"),
   buyButton: document.getElementById("buyButton"),
-  restartButton: document.getElementById("restartButton")
+  restartButton: document.getElementById("restartButton"),
+  openRulesButton: document.getElementById("openRulesButton"),
+  openLogButton: document.getElementById("openLogButton"),
+  closeRulesButton: document.getElementById("closeRulesButton"),
+  closeLogButton: document.getElementById("closeLogButton"),
+  rulesModal: document.getElementById("rulesModal"),
+  logModal: document.getElementById("logModal")
 };
 
 const REVEAL_DELAY = 1400;
 let pendingRoundTimeoutId = null;
 let pendingBreakdownTimeoutIds = [];
+const HIGHLIGHT_DURATION_MS = 900;
+const highlightTimeoutIds = new Map();
 
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
@@ -67,10 +75,51 @@ function rollRenewableOutput(renewableCount) {
   return total;
 }
 
+function openModal(modalEl) {
+  modalEl?.classList.remove("hidden");
+}
+
+function closeModal(modalEl) {
+  modalEl?.classList.add("hidden");
+}
+
+function closeAllModals() {
+  closeModal(els.rulesModal);
+  closeModal(els.logModal);
+}
+
 function addLog(message) {
   const item = document.createElement("li");
   item.textContent = message;
   els.logList.prepend(item);
+}
+
+function flashElement(target, className = "is-updating", durationMs = HIGHLIGHT_DURATION_MS) {
+  if (!target) {
+    return;
+  }
+
+  const previousTimeout = highlightTimeoutIds.get(target);
+  if (previousTimeout) {
+    window.clearTimeout(previousTimeout);
+  }
+
+  target.classList.remove(className);
+  // Force reflow so repeated flashes replay the animation.
+  void target.offsetWidth;
+  target.classList.add(className);
+
+  const timeoutId = window.setTimeout(() => {
+    target.classList.remove(className);
+    highlightTimeoutIds.delete(target);
+  }, durationMs);
+
+  highlightTimeoutIds.set(target, timeoutId);
+}
+
+function flashStatValue(valueEl) {
+  const card = valueEl?.closest(".card");
+  flashElement(card);
 }
 
 function getTip({ demand, renewableOutput, fossilUsed, income, boughtThisTurn }) {
@@ -189,12 +238,43 @@ function setRoundDemandAnnouncement(message = "") {
 }
 
 function setDisplayedRoundValues(roundValues = {}, displayedMoney = state.displayedMoney) {
+  const previousDisplayedRound = { ...state.displayedRound };
+  const previousDisplayedMoney = state.displayedMoney;
+
   state.displayedRound = {
     ...state.displayedRound,
     ...roundValues
   };
   state.displayedMoney = displayedMoney;
   render();
+
+  if (
+    Object.prototype.hasOwnProperty.call(roundValues, "demand") &&
+    roundValues.demand !== previousDisplayedRound.demand
+  ) {
+    flashStatValue(els.demandValue);
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(roundValues, "renewableOutput") &&
+    roundValues.renewableOutput !== previousDisplayedRound.renewableOutput
+  ) {
+    flashStatValue(els.renewableOutputValue);
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(roundValues, "fossilUsed") &&
+    roundValues.fossilUsed !== previousDisplayedRound.fossilUsed
+  ) {
+    flashStatValue(els.fossilUsedValue);
+  }
+  if (
+    Object.prototype.hasOwnProperty.call(roundValues, "income") &&
+    roundValues.income !== previousDisplayedRound.income
+  ) {
+    flashStatValue(els.incomeValue);
+  }
+  if (displayedMoney !== previousDisplayedMoney) {
+    flashStatValue(els.moneyValue);
+  }
 }
 
 function clearRoundBreakdownReveal() {
@@ -451,6 +531,9 @@ function buyRenewable() {
     boughtThisTurn: true
   });
   render();
+  flashStatValue(els.moneyValue);
+  flashStatValue(els.fossilValue);
+  flashStatValue(els.renewableValue);
 }
 
 function restartGame() {
@@ -494,5 +577,24 @@ function restartGame() {
 els.playRoundButton.addEventListener("click", playRound);
 els.buyButton.addEventListener("click", buyRenewable);
 els.restartButton.addEventListener("click", restartGame);
+els.openRulesButton?.addEventListener("click", () => openModal(els.rulesModal));
+els.openLogButton?.addEventListener("click", () => openModal(els.logModal));
+els.closeRulesButton?.addEventListener("click", () => closeModal(els.rulesModal));
+els.closeLogButton?.addEventListener("click", () => closeModal(els.logModal));
+els.rulesModal?.addEventListener("click", (event) => {
+  if (event.target === els.rulesModal) {
+    closeModal(els.rulesModal);
+  }
+});
+els.logModal?.addEventListener("click", (event) => {
+  if (event.target === els.logModal) {
+    closeModal(els.logModal);
+  }
+});
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeAllModals();
+  }
+});
 
 render();

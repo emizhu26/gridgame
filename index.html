@@ -9,21 +9,32 @@
   <body>
     <main class="app">
       <header class="app-header">
+        <div class="header-actions">
+          <button
+            id="openRulesButton"
+            class="icon-button secondary"
+            type="button"
+            aria-label="Open rules"
+            title="Rules"
+          >
+            ?
+          </button>
+          <button
+            id="openLogButton"
+            class="icon-button secondary"
+            type="button"
+            aria-label="Open round log"
+            title="Round log"
+          >
+            Log
+          </button>
+        </div>
         <h1>Renewable Grid Game</h1>
         <p>
           Replace all fossil plants with renewables, then survive 2 more rounds
           without blackouts.
         </p>
       </header>
-
-      <section class="fossil-strip panel" aria-label="Remaining fossil plants">
-        <article class = "card"> <h2>Remaining Fossil Plants</h2><p id="fossilValue">4</p></article>
-        <div id="fossilIcons" class="fossil-icons"></div>
-        <div class="round-summary" aria-live="polite">
-          <p id="roundDemandAnnouncement" class="round-demand-announcement"></p>
-          <p id="roundBreakdown" class="round-breakdown"></p>
-        </div>
-      </section>
 
       <section class="stats-grid" aria-label="Game stats">
         <article class="card"><h2>Round</h2><p id="roundValue">1</p></article>
@@ -41,35 +52,61 @@
         <button id="restartButton" class="secondary">Restart</button>
       </section>
 
-      <section class="insights-grid">
-        <article class="panel">
-          <h2>Educational Tip</h2>
+      <section class="insights-grid compact-tip">
+        <article class="panel tip-panel">
+          <h2>Tip</h2>
           <p id="tipText">
             Renewable output changes each round, so planning reserves is key for
             reliability.
           </p>
           <p id="statusText" class="status">Game ready. Press Play Round.</p>
         </article>
-
-        <article class="panel">
-          <h2>Rules Snapshot</h2>
-          <ul>
-            <li>Demand each round: roll 1-16.</li>
-            <li>Each renewable generates 1-4 power.</li>
-            <li>Any remaining fossil plant can cover unmet demand in that round.</li>
-            <li>Fossil fallback cost: ceil(fossil used / 2).</li>
-            <li>Income: demand - fossil cost.</li>
-            <li>Each renewable purchase costs 24 and replaces 1 fossil.</li>
-            <li>You only blackout if renewables fall short after all fossil plants are gone.</li>
-          </ul>
-        </article>
-
-        <article class="panel">
-          <h2>Round Log</h2>
-          <ol id="logList" class="log-list"></ol>
+        <article class="card fossil-count-card">
+          <h2>Remaining Fossil Plants</h2>
+          <p id="fossilValue">4</p>
         </article>
       </section>
+
+      <section class="fossil-strip" aria-label="Remaining fossil plants">
+        <div class="fossil-top">
+          <div class="round-summary card" aria-live="polite">
+            <p id="roundDemandAnnouncement" class="round-demand-announcement"></p>
+            <p id="roundBreakdown" class="round-breakdown"></p>
+          </div>
+        </div>
+        <div class="power-plot" aria-label="Power plant field">
+          <div id="fossilIcons" class="fossil-icons"></div>
+        </div>
+      </section>
     </main>
+
+    <div id="rulesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="rulesModalTitle">
+      <div class="modal-card panel">
+        <div class="modal-header">
+          <h2 id="rulesModalTitle">Rules Snapshot</h2>
+          <button id="closeRulesButton" class="close-button secondary" type="button" aria-label="Close rules">&times;</button>
+        </div>
+        <ul>
+          <li>Demand each round: roll 1-16.</li>
+          <li>Each renewable generates 1-4 power.</li>
+          <li>Any remaining fossil plant can cover unmet demand in that round.</li>
+          <li>Fossil fallback cost: ceil(fossil used / 2).</li>
+          <li>Income: demand - fossil cost.</li>
+          <li>Each renewable purchase costs 24 and replaces 1 fossil.</li>
+          <li>You only blackout if renewables fall short after all fossil plants are gone.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="logModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="logModalTitle">
+      <div class="modal-card panel">
+        <div class="modal-header">
+          <h2 id="logModalTitle">Round Log</h2>
+          <button id="closeLogButton" class="close-button secondary" type="button" aria-label="Close round log">&times;</button>
+        </div>
+        <ol id="logList" class="log-list"></ol>
+      </div>
+    </div>
 
     <script src="./game.js"></script>
   </body>
