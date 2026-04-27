@@ -2,6 +2,25 @@ const STARTING_FOSSIL = 4;
 const RENEWABLE_COST = 24;
 const POST_TRANSITION_ROUNDS = 4;
 const STARTING_MONEY = 12;
+const REVEAL_DELAY = 1400;
+const HIGHLIGHT_DURATION_MS = 900;
+const EMERGENCY_MARKET_SURCHARGE = 2;
+
+const SPARKY_INTRO_MESSAGE =
+  "Hi I'm sparky! Welcome to the grid game. Your goal is to replace all the power plants with renewable energy sources to make the grid greener! But beware of blackouts! To see all the rules press the ? box in the top corner. Have fun!";
+
+const SPARKY_RENEWABLE_TIPS = [
+  "Great first step. Renewable energy sources like solar and wind generate electricity without burning fuel, which helps cut air pollution and carbon emissions.",
+  "Mixing renewable sources can make the grid stronger because different technologies produce power under different weather conditions.",
+  "As more renewables come online, you must balance changing supply with demand, storage, and backup planning to avoid shortages. Reminder: you can sell surplus renewables energy in the market for extra money!",
+  "You replaced the last fossil plant! A fully renewable grid still needs careful planning so clean energy stays reliable. Tip: you can buy energy from the market to be prepared if renewables come up short!",
+];
+
+const SPARKY_WIN_MESSAGE =
+  "You won! You replaced every fossil plant and kept the grid reliable through the full transition. That is exactly how a cleaner power system succeeds.";
+
+const SPARKY_LOSS_MESSAGE =
+  "Uh oh! You did not have enough renewable energy to meet demand, and the emergency market price was too high so the grid experienced a blackout. In a real blackout, power outages can last for hours or days and cause major disruptions. To avoid blackouts, grid operators need to carefully balance supply and demand and maintain backup resources";
 
 const state = {
   round: 1,
@@ -28,7 +47,9 @@ const state = {
   marketSellPrice: randInt(1, 2),
   marketBuyPrice: randInt(3, 5),
   marketEnergy: 0,
-  sellableSurplus: 0
+  sellableSurplus: 0,
+  awaitingEmergencyPurchase: false,
+  emergencyRound: null
 };
 
 const els = {
@@ -52,22 +73,27 @@ const els = {
   restartButton: document.getElementById("restartButton"),
   openRulesButton: document.getElementById("openRulesButton"),
   openLogButton: document.getElementById("openLogButton"),
-  closeMarketButton: document.getElementById("closeMarketButton"),
   closeRulesButton: document.getElementById("closeRulesButton"),
   closeLogButton: document.getElementById("closeLogButton"),
+  closeMarketButton: document.getElementById("closeMarketButton"),
+  closeSparkyButton: document.getElementById("closeSparkyButton"),
   rulesModal: document.getElementById("rulesModal"),
   logModal: document.getElementById("logModal"),
   marketModal: document.getElementById("marketModal"),
+  sparkyModal: document.getElementById("sparkyModal"),
   marketPricesText: document.getElementById("marketPricesText"),
   marketInventoryText: document.getElementById("marketInventoryText"),
   sellEnergyButton: document.getElementById("sellEnergyButton"),
-  buyEnergyButton: document.getElementById("buyEnergyButton")
+  buyEnergyButton: document.getElementById("buyEnergyButton"),
+  sparkyModalTitle: document.getElementById("sparkyModalTitle"),
+  sparkyBubble: document.getElementById("sparkyBubble"),
+  sparkyLabel: document.getElementById("sparkyLabel"),
+  sparkyText: document.getElementById("sparkyText"),
+  sparkyImg: document.getElementById("sparkyImg")
 };
 
-const REVEAL_DELAY = 1400;
 let pendingRoundTimeoutId = null;
 let pendingBreakdownTimeoutIds = [];
-const HIGHLIGHT_DURATION_MS = 900;
 const highlightTimeoutIds = new Map();
 
 function randInt(min, max) {
@@ -98,6 +124,7 @@ function closeAllModals() {
   closeModal(els.rulesModal);
   closeModal(els.logModal);
   closeModal(els.marketModal);
+  closeModal(els.sparkyModal);
 }
 
 function rerollMarketPrices() {
@@ -106,17 +133,30 @@ function rerollMarketPrices() {
 }
 
 function updateMarketUi() {
+  const isEmergency = state.awaitingEmergencyPurchase && state.emergencyRound;
+  const activeBuyPrice = isEmergency
+    ? state.emergencyRound.buyPrice
+    : state.marketBuyPrice;
+
   if (els.marketPricesText) {
-    els.marketPricesText.textContent = `Round ${state.round} prices — Sell: ${state.marketSellPrice}/unit, Buy: ${state.marketBuyPrice}/unit.`;
+    els.marketPricesText.textContent = isEmergency
+      ? `Emergency market pricing - Sell: ${state.marketSellPrice}/unit, Buy: ${activeBuyPrice}/unit.`
+      : `Round ${state.round} prices - Sell: ${state.marketSellPrice}/unit, Buy: ${activeBuyPrice}/unit.`;
   }
+
   if (els.marketInventoryText) {
-    els.marketInventoryText.textContent = `Stored energy: ${state.marketEnergy}. Sellable renewable surplus: ${state.sellableSurplus}.`;
+    els.marketInventoryText.textContent = isEmergency
+      ? `Stored energy: ${state.marketEnergy}. You must buy ${state.emergencyRound.unitsNeeded} more unit(s) at the emergency price to avoid a blackout.`
+      : `Stored energy: ${state.marketEnergy}. Sellable renewable surplus: ${state.sellableSurplus}.`;
   }
+
   if (els.sellEnergyButton) {
-    els.sellEnergyButton.disabled = state.sellableSurplus <= 0 || state.gameOver;
+    els.sellEnergyButton.disabled =
+      state.sellableSurplus <= 0 || state.gameOver || state.awaitingEmergencyPurchase;
   }
+
   if (els.buyEnergyButton) {
-    els.buyEnergyButton.disabled = state.money < state.marketBuyPrice || state.gameOver;
+    els.buyEnergyButton.disabled = state.money < activeBuyPrice || state.gameOver;
   }
 }
 
@@ -126,7 +166,11 @@ function addLog(message) {
   els.logList.prepend(item);
 }
 
-function flashElement(target, className = "is-updating", durationMs = HIGHLIGHT_DURATION_MS) {
+function flashElement(
+  target,
+  className = "is-updating",
+  durationMs = HIGHLIGHT_DURATION_MS
+) {
   if (!target) {
     return;
   }
@@ -137,7 +181,6 @@ function flashElement(target, className = "is-updating", durationMs = HIGHLIGHT_
   }
 
   target.classList.remove(className);
-  // Force reflow so repeated flashes replay the animation.
   void target.offsetWidth;
   target.classList.add(className);
 
@@ -158,24 +201,31 @@ function getTip({ demand, renewableOutput, fossilUsed, income, boughtThisTurn })
   if (state.gameOver && state.won) {
     return "Great job balancing reliability and emissions. A clean grid still needs careful planning.";
   }
+
   if (state.gameOver && !state.won) {
     return "Blackout risk falls when you diversify clean power and maintain enough backup capacity.";
   }
+
   if (boughtThisTurn) {
     return "Investing in renewables reduces long-term fossil reliance, even when output varies.";
   }
+
   if (state.renewables === 0) {
     return "With no renewables yet, every unit depends on fossil plants and adds operating cost.";
   }
+
   if (renewableOutput >= demand) {
     return "High renewable output covered demand this round. Variability can create big savings.";
   }
+
   if (fossilUsed > renewableOutput) {
     return "Fossil backup kept the lights on, but fuel costs reduced your net income.";
   }
+
   if (income <= Math.ceil(demand * 0.6)) {
     return "High fossil usage can eat into earnings and slow down your clean-energy transition.";
   }
+
   return "Balancing variable supply with dependable backup is central to grid planning.";
 }
 
@@ -183,73 +233,48 @@ function updateButtons() {
   els.buyButton.disabled =
     state.gameOver ||
     state.isResolvingRound ||
+    state.awaitingEmergencyPurchase ||
     state.money < RENEWABLE_COST ||
     state.fossilPlants <= 0;
-  els.playRoundButton.disabled = state.gameOver || state.isResolvingRound;
+
+  els.playRoundButton.disabled =
+    state.gameOver || state.isResolvingRound || state.awaitingEmergencyPurchase;
   els.restartButton.disabled = state.isResolvingRound;
+
   if (els.marketButton) {
     els.marketButton.disabled = state.gameOver;
   }
+}
+
+function createPlantIcon(src, alt) {
+  const icon = document.createElement("img");
+  icon.src = src;
+  icon.alt = alt;
+  icon.className = "fossil-icon";
+  return icon;
+}
+
+function createRenewableIcon(index) {
+  if (index % 2 === 0) {
+    return createPlantIcon("./src/img/renewables.png", "Solar renewable source");
+  }
+
+  return createPlantIcon("./src/img/wind_renewable.png", "Wind renewable source");
 }
 
 function renderFossilIcons() {
   els.fossilIcons.innerHTML = "";
 
   for (let i = 0; i < state.fossilPlants; i += 1) {
-    const icon = document.createElement("img");
-    icon.src = "./src/img/fossil_fuel.png";
-    icon.alt = "Fossil fuel plant";
-    icon.className = "fossil-icon";
-    els.fossilIcons.append(icon);
+    els.fossilIcons.append(
+      createPlantIcon("./src/img/fossil_fuel.png", "Fossil fuel plant")
+    );
   }
-  if(state.renewables != 0){
-    if (state.renewables == 1) {
-    const icon = solarIcon();
-    els.fossilIcons.append(icon);
-  }
-    if(state.renewables == 2) {
-    const icon2 = windIcon();
-    els.fossilIcons.append(icon2);
-    const icon1 = solarIcon();
-    els.fossilIcons.append(icon1);
-  }
-    if(state.renewables == 3) {
-    const icon1 = solarIcon();
-    els.fossilIcons.append(icon1);
-    const icon2 = windIcon();
-    els.fossilIcons.append(icon2);
-    const icon3 = solarIcon();
-    els.fossilIcons.append(icon3);
-  }
-  if(state.renewables == 4) {
-    const icon2 = windIcon();
-    els.fossilIcons.append(icon2);
-    const icon1 = solarIcon();
-    els.fossilIcons.append(icon1);
-    const icon4 = windIcon();
-    els.fossilIcons.append(icon4);
-    const icon3 = solarIcon();
-    els.fossilIcons.append(icon3);   
-    }
+
+  for (let i = 0; i < state.renewables; i += 1) {
+    els.fossilIcons.append(createRenewableIcon(i));
   }
 }
-
-function solarIcon(){
-  const icon = document.createElement("img");
-  icon.src = "./src/img/renewables.png";
-  icon.alt = "Renewable energy source";
-  icon.className = "fossil-icon"
-  return icon; 
-}
-
-function windIcon(){
-  const icon = document.createElement("img");
-    icon.src = "./src/img/wind_renewable.jpeg";
-    icon.alt = "Renewable energy source";
-    icon.className = "fossil-icon";
-    return icon;
-}
-
 
 function render() {
   const { demand, renewableOutput, fossilUsed, income } = state.displayedRound;
@@ -261,7 +286,8 @@ function render() {
   els.demandValue.textContent = demand === null ? "-" : String(demand);
   els.renewableOutputValue.textContent =
     renewableOutput === null ? "-" : String(renewableOutput);
-  els.fossilUsedValue.textContent = fossilUsed === null ? "-" : String(fossilUsed);
+  els.fossilUsedValue.textContent =
+    fossilUsed === null ? "-" : String(fossilUsed);
   els.incomeValue.textContent = income === null ? "-" : String(income);
 
   renderFossilIcons();
@@ -273,7 +299,10 @@ function setRoundDemandAnnouncement(message = "") {
   els.roundDemandAnnouncement.textContent = message;
 }
 
-function setDisplayedRoundValues(roundValues = {}, displayedMoney = state.displayedMoney) {
+function setDisplayedRoundValues(
+  roundValues = {},
+  displayedMoney = state.displayedMoney
+) {
   const previousDisplayedRound = { ...state.displayedRound };
   const previousDisplayedMoney = state.displayedMoney;
 
@@ -290,24 +319,28 @@ function setDisplayedRoundValues(roundValues = {}, displayedMoney = state.displa
   ) {
     flashStatValue(els.demandValue);
   }
+
   if (
     Object.prototype.hasOwnProperty.call(roundValues, "renewableOutput") &&
     roundValues.renewableOutput !== previousDisplayedRound.renewableOutput
   ) {
     flashStatValue(els.renewableOutputValue);
   }
+
   if (
     Object.prototype.hasOwnProperty.call(roundValues, "fossilUsed") &&
     roundValues.fossilUsed !== previousDisplayedRound.fossilUsed
   ) {
     flashStatValue(els.fossilUsedValue);
   }
+
   if (
     Object.prototype.hasOwnProperty.call(roundValues, "income") &&
     roundValues.income !== previousDisplayedRound.income
   ) {
     flashStatValue(els.incomeValue);
   }
+
   if (displayedMoney !== previousDisplayedMoney) {
     flashStatValue(els.moneyValue);
   }
@@ -343,6 +376,288 @@ function setRoundBreakdown(steps = []) {
   });
 }
 
+function setSparkyMessage(text, educational = false) {
+  if (!els.sparkyText || !els.sparkyImg) {
+    return;
+  }
+
+  if (els.sparkyModalTitle) {
+    els.sparkyModalTitle.textContent = educational ? "Sparky's tip" : "Sparky says...";
+  }
+
+  if (els.sparkyLabel) {
+    els.sparkyLabel.hidden = !educational;
+  }
+
+  els.sparkyText.textContent = text;
+  els.sparkyImg.classList.remove("sparky-talking");
+  void els.sparkyImg.offsetWidth;
+  els.sparkyImg.classList.add("sparky-talking");
+
+  window.setTimeout(() => {
+    els.sparkyImg?.classList.remove("sparky-talking");
+  }, 600);
+}
+
+function showSparkyMessage(text, educational = false) {
+  setSparkyMessage(text, educational);
+  openModal(els.sparkyModal);
+}
+
+function showIntroSparkyMessage() {
+  showSparkyMessage(SPARKY_INTRO_MESSAGE, false);
+}
+
+function showRenewableTip() {
+  const renewableIndex = Math.max(0, state.renewables - 1);
+  const tip =
+    SPARKY_RENEWABLE_TIPS[renewableIndex] ??
+    SPARKY_RENEWABLE_TIPS[SPARKY_RENEWABLE_TIPS.length - 1];
+
+  els.tipText.textContent = tip;
+  showSparkyMessage(tip, true);
+}
+
+function showEndGameSparkyMessage() {
+  const message = state.won ? SPARKY_WIN_MESSAGE : SPARKY_LOSS_MESSAGE;
+  showSparkyMessage(message, false);
+}
+
+function startEmergencyMarketResponse({
+  demand,
+  renewableOutput,
+  renewableUsed,
+  marketUsed,
+  shortfall,
+  moneyBeforeRound
+}) {
+  const emergencyBuyPrice = state.marketBuyPrice + EMERGENCY_MARKET_SURCHARGE;
+  const totalEmergencyCost = shortfall * emergencyBuyPrice;
+
+  if (state.money < totalEmergencyCost) {
+    state.lastRound = {
+      demand,
+      renewableOutput,
+      fossilUsed: 0,
+      income: 0
+    };
+    state.gameOver = true;
+    state.won = false;
+
+    setRoundDemandAnnouncement(`Your energy demand for the round is ${demand}.`);
+    setRoundBreakdown([
+      {
+        text: `Renewables covered ${renewableUsed} units of energy.`,
+        onReveal: () => {
+          setDisplayedRoundValues(
+            {
+              demand,
+              renewableOutput,
+              fossilUsed: null,
+              income: null
+            },
+            moneyBeforeRound
+          );
+        }
+      },
+      {
+        text: marketUsed > 0
+          ? `Stored market energy covered ${marketUsed} units. You still needed ${shortfall} more unit(s), but the emergency market price jumped to ${emergencyBuyPrice} per unit.`
+          : `You still needed ${shortfall} more unit(s), and the emergency market price jumped to ${emergencyBuyPrice} per unit.`,
+        onReveal: () => {
+          setDisplayedRoundValues(
+            {
+              demand,
+              renewableOutput,
+              fossilUsed: 0,
+              income: null
+            },
+            moneyBeforeRound
+          );
+        }
+      },
+      {
+        text: `Overall, you needed ${totalEmergencyCost} money to avoid the blackout, but you did not have enough.`,
+        onReveal: () => {
+          state.isResolvingRound = false;
+          setDisplayedRoundValues(
+            {
+              demand,
+              renewableOutput,
+              fossilUsed: 0,
+              income: 0
+            },
+            moneyBeforeRound
+          );
+          render();
+          showEndGameSparkyMessage();
+        }
+      }
+    ]);
+
+    els.statusText.textContent = "Blackout: you could not afford the emergency market price.";
+    els.tipText.textContent = getTip({
+      demand,
+      renewableOutput,
+      fossilUsed: 0,
+      income: 0,
+      boughtThisTurn: false
+    });
+    addLog(
+      `Round ${state.round}: Demand ${demand}, renewables ${renewableOutput}, stored market used ${marketUsed}, emergency price ${emergencyBuyPrice}/unit, needed ${shortfall} more unit(s). Blackout occurred.`
+    );
+    render();
+    return true;
+  }
+
+  state.awaitingEmergencyPurchase = true;
+  state.isResolvingRound = false;
+  state.emergencyRound = {
+    demand,
+    renewableOutput,
+    renewableUsed,
+    marketUsed,
+    unitsNeeded: shortfall,
+    unitsPurchased: 0,
+    buyPrice: emergencyBuyPrice,
+    totalPurchaseCost: 0,
+    moneyBeforeRound
+  };
+
+  setRoundDemandAnnouncement(`Your energy demand for the round is ${demand}.`);
+  setRoundBreakdown([
+    {
+      text: `Renewables accounted for ${renewableUsed} units of energy.`,
+      onReveal: () => {
+        setDisplayedRoundValues(
+          {
+            demand,
+            renewableOutput,
+            fossilUsed: null,
+            income: null
+          },
+          moneyBeforeRound
+        );
+      }
+    },
+    {
+      text: marketUsed > 0
+        ? `Stored market energy covered ${marketUsed} units. You still need ${shortfall} more unit(s).`
+        : `You still need ${shortfall} more unit(s) to meet demand.`,
+      onReveal: () => {
+        setDisplayedRoundValues(
+          {
+            demand,
+            renewableOutput,
+            fossilUsed: 0,
+            income: null
+          },
+          moneyBeforeRound
+        );
+      }
+    },
+    {
+      text: `Emergency market prices are now ${emergencyBuyPrice} per unit. Open the market and buy ${shortfall} unit(s) to avoid a blackout.`,
+      onReveal: () => {
+        render();
+        showSparkyMessage(
+          `You do not have enough renewable energy this round. The market can save you, but the emergency price has gone up to ${emergencyBuyPrice} per unit. Buy ${shortfall} unit(s) now to avoid a blackout.`,
+          true
+        );
+      }
+    }
+  ]);
+
+  els.statusText.textContent = `Emergency: buy ${shortfall} market unit(s) at ${emergencyBuyPrice} each to avoid a blackout.`;
+  els.tipText.textContent =
+    "When the grid is tight, emergency energy usually costs more than normal market power.";
+  addLog(
+    `Round ${state.round}: Demand ${demand}, renewables ${renewableOutput}, stored market used ${marketUsed}. Emergency market triggered at ${emergencyBuyPrice}/unit for ${shortfall} unit(s).`
+  );
+  render();
+  return true;
+}
+
+function finalizeEmergencyRound() {
+  if (!state.awaitingEmergencyPurchase || !state.emergencyRound) {
+    return;
+  }
+
+  const {
+    demand,
+    renewableOutput,
+    marketUsed,
+    unitsPurchased,
+    totalPurchaseCost
+  } = state.emergencyRound;
+  const income = demand - totalPurchaseCost;
+
+  state.money += demand;
+  state.round += 1;
+  state.awaitingEmergencyPurchase = false;
+  state.isResolvingRound = false;
+
+  setRoundBreakdown([
+    {
+      text:
+        marketUsed > 0
+          ? `Stored market energy covered ${marketUsed} units, and emergency market purchases covered ${unitsPurchased} more unit(s) for ${totalPurchaseCost} money.`
+          : `Emergency market purchases covered ${unitsPurchased} unit(s) for ${totalPurchaseCost} money.`,
+      onReveal: () => {
+        setDisplayedRoundValues(
+          {
+            demand,
+            renewableOutput,
+            fossilUsed: 0,
+            income: null
+          },
+          state.money - demand
+        );
+      }
+    },
+    {
+      text: `Overall, you added ${income} money units this round and avoided a blackout.`,
+      onReveal: () => {
+        setDisplayedRoundValues(
+          {
+            demand,
+            renewableOutput,
+            fossilUsed: 0,
+            income
+          },
+          state.money
+        );
+        render();
+
+        if (state.gameOver && state.won) {
+          showEndGameSparkyMessage();
+        }
+      }
+    }
+  ]);
+
+  state.lastRound = {
+    demand,
+    renewableOutput,
+    fossilUsed: 0,
+    income
+  };
+
+  addLog(
+    `Round ${state.round - 1}: Emergency market bought ${unitsPurchased} unit(s) for ${totalPurchaseCost}. Income ${income >= 0 ? "+" : ""}${income}.`
+  );
+
+  els.statusText.textContent =
+    "Emergency purchases kept the lights on. You can play the next round.";
+  els.tipText.textContent =
+    "Emergency energy can prevent a blackout, but price spikes make last-minute fixes expensive.";
+  state.emergencyRound = null;
+  checkWinProgress();
+  render();
+  rerollMarketPrices();
+  updateMarketUi();
+}
+
 function checkWinProgress() {
   if (state.fossilPlants > 0) {
     state.postTransitionRoundsSurvived = 0;
@@ -350,6 +665,7 @@ function checkWinProgress() {
   }
 
   state.postTransitionRoundsSurvived += 1;
+
   if (state.postTransitionRoundsSurvived >= POST_TRANSITION_ROUNDS) {
     state.gameOver = true;
     state.won = true;
@@ -370,84 +686,31 @@ function resolveRound(demand) {
   const shortfall = Math.max(0, shortfallAfterRenewables - marketUsed);
   const renewableUsed = Math.min(demand, renewableOutput);
   state.sellableSurplus = Math.max(0, renewableOutput - demand);
-
+  
   if (shortfall > 0 && state.fossilPlants === 0) {
-    state.lastRound = {
+    const handledByEmergencyMarket = startEmergencyMarketResponse({
       demand,
       renewableOutput,
-      fossilUsed: 0,
-      income: 0
-    };
-    state.gameOver = true;
-    state.won = false;
-    setRoundDemandAnnouncement(`Your energy demand for the round is ${demand}.`);
-    setRoundBreakdown([
-      {
-        text: `Renewables covered ${renewableUsed} units of energy.`,
-        onReveal: () => {
-          setDisplayedRoundValues(
-            {
-              demand,
-              renewableOutput,
-              fossilUsed: null,
-              income: null
-            },
-            moneyBeforeRound
-          );
-        }
-      },
-      {
-        text:
-          marketUsed > 0
-            ? `Market energy covered ${marketUsed} units. Fossil fuels covered 0 units because you have none left.`
-            : "Fossil fuels covered 0 units because you have none left.",
-        onReveal: () => {
-          setDisplayedRoundValues(
-            {
-              demand,
-              renewableOutput,
-              fossilUsed: 0,
-              income: null
-            },
-            moneyBeforeRound
-          );
-        }
-      },
-      {
-        text: "Overall, you added 0 money this round and blacked out.",
-        onReveal: () => {
-          state.isResolvingRound = false;
-          setDisplayedRoundValues(
-            {
-              demand,
-              renewableOutput,
-              fossilUsed: 0,
-              income: 0
-            },
-            moneyBeforeRound
-          );
-        }
-      }
-    ]);
-    els.statusText.textContent = "Blackout: demand exceeded your available supply.";
-    els.tipText.textContent = getTip({
-      demand,
-      renewableOutput,
-      fossilUsed: 0,
-      income: 0,
-      boughtThisTurn: false
+      renewableUsed,
+      marketUsed,
+      shortfall,
+      moneyBeforeRound
     });
-    addLog(
-      `Round ${state.round}: Demand ${demand}, renewables ${renewableOutput}. Blackout occurred.`
-    );
-    render();
+
+    if (handledByEmergencyMarket) {
+      updateMarketUi();
+    }
     return;
   }
 
   const fossilUsed = shortfall;
   const fossilCost = Math.ceil(fossilUsed / 2);
+  const marketCoveredThisRound = marketUsed;
   const income = demand - fossilCost;
+  const roundStatusText =
+    "Round complete. You can buy a renewable before the next round.";
   state.money += income;
+
   setRoundDemandAnnouncement(`Your energy demand for the round is ${demand}.`);
   setRoundBreakdown([
     {
@@ -465,10 +728,9 @@ function resolveRound(demand) {
       }
     },
     {
-      text:
-        marketUsed > 0
-          ? `Stored market energy covered ${marketUsed} units. Fossil fuels covered ${fossilUsed} units of energy at a cost of ${fossilCost} money units.`
-          : `Fossil fuels covered ${fossilUsed} units of energy at a cost of ${fossilCost} money units.`,
+      text: marketUsed > 0
+        ? `Stored market energy covered ${marketUsed} units. Fossil fuels covered ${fossilUsed} units of energy at a cost of ${fossilCost} money units.`
+        : `Fossil fuels covered ${fossilUsed} units of energy at a cost of ${fossilCost} money units.`,
       onReveal: () => {
         setDisplayedRoundValues(
           {
@@ -495,6 +757,11 @@ function resolveRound(demand) {
           },
           state.money
         );
+        render();
+
+        if (state.gameOver && state.won) {
+          showEndGameSparkyMessage();
+        }
       }
     }
   ]);
@@ -507,10 +774,10 @@ function resolveRound(demand) {
   };
 
   addLog(
-    `Round ${state.round}: Demand ${demand}, renewables ${renewableOutput}, market used ${marketUsed}, fossil used ${fossilUsed}, income +${income}.`
+    `Round ${state.round}: Demand ${demand}, renewables ${renewableOutput}, market used ${marketCoveredThisRound}, fossil used ${fossilUsed}, income ${income >= 0 ? "+" : ""}${income}.`
   );
 
-  els.statusText.textContent = "Round complete. You can buy a renewable before the next round.";
+  els.statusText.textContent = roundStatusText;
   checkWinProgress();
   els.tipText.textContent = getTip({
     demand,
@@ -519,6 +786,7 @@ function resolveRound(demand) {
     income,
     boughtThisTurn: false
   });
+
   render();
   rerollMarketPrices();
   updateMarketUi();
@@ -532,6 +800,7 @@ function playRound() {
   state.sellableSurplus = 0;
   const demand = rollDemand();
   state.isResolvingRound = true;
+
   setRoundDemandAnnouncement(`Your energy demand for the round is ${demand}.`);
   setDisplayedRoundValues(
     {
@@ -579,21 +848,25 @@ function buyRenewable() {
     income: state.lastRound.income ?? 0,
     boughtThisTurn: true
   });
+
   render();
   flashStatValue(els.moneyValue);
   flashStatValue(els.fossilValue);
   flashStatValue(els.renewableValue);
+  showRenewableTip();
 }
 
 function sellSurplusEnergy() {
   if (state.gameOver || state.sellableSurplus <= 0) {
     return;
   }
+
   const unitsSold = state.sellableSurplus;
   const revenue = unitsSold * state.marketSellPrice;
   state.sellableSurplus = 0;
   state.money += revenue;
   state.displayedMoney = state.money;
+
   addLog(`Market: Sold ${unitsSold} surplus renewable unit(s) for +${revenue}.`);
   els.statusText.textContent = `Sold ${unitsSold} surplus energy unit(s) on the market.`;
   render();
@@ -602,8 +875,45 @@ function sellSurplusEnergy() {
 
 function buyMarketEnergy() {
   if (state.gameOver || state.money < state.marketBuyPrice) {
+    if (!state.awaitingEmergencyPurchase) {
+      return;
+    }
+  }
+
+  if (state.awaitingEmergencyPurchase && state.emergencyRound) {
+    const emergencyBuyPrice = state.emergencyRound.buyPrice;
+
+    if (state.money < emergencyBuyPrice) {
+      return;
+    }
+
+    state.money -= emergencyBuyPrice;
+    state.displayedMoney = state.money;
+    state.emergencyRound.unitsNeeded -= 1;
+    state.emergencyRound.unitsPurchased += 1;
+    state.emergencyRound.totalPurchaseCost += emergencyBuyPrice;
+
+    addLog(
+      `Emergency market: Bought 1 energy unit for ${emergencyBuyPrice}. ${state.emergencyRound.unitsNeeded} more unit(s) needed.`
+    );
+    els.statusText.textContent =
+      state.emergencyRound.unitsNeeded > 0
+        ? `Emergency purchase made. Buy ${state.emergencyRound.unitsNeeded} more unit(s) to avoid a blackout.`
+        : "Emergency purchase complete. The round can now be resolved.";
+    render();
+    flashStatValue(els.moneyValue);
+    updateMarketUi();
+
+    if (state.emergencyRound.unitsNeeded <= 0) {
+      finalizeEmergencyRound();
+    }
     return;
   }
+
+  if (state.gameOver || state.money < state.marketBuyPrice) {
+    return;
+  }
+
   state.money -= state.marketBuyPrice;
   state.displayedMoney = state.money;
   state.marketEnergy += 1;
@@ -618,7 +928,9 @@ function restartGame() {
     window.clearTimeout(pendingRoundTimeoutId);
     pendingRoundTimeoutId = null;
   }
+
   clearRoundBreakdownReveal();
+  closeAllModals();
 
   state.round = 1;
   state.money = STARTING_MONEY;
@@ -643,6 +955,8 @@ function restartGame() {
   };
   state.marketEnergy = 0;
   state.sellableSurplus = 0;
+  state.awaitingEmergencyPurchase = false;
+  state.emergencyRound = null;
   rerollMarketPrices();
 
   els.logList.innerHTML = "";
@@ -652,6 +966,7 @@ function restartGame() {
   els.tipText.textContent =
     "Renewable output changes each round, so planning reserves is key for reliability.";
   render();
+  showIntroSparkyMessage();
 }
 
 els.playRoundButton.addEventListener("click", playRound);
@@ -660,26 +975,37 @@ els.marketButton?.addEventListener("click", () => openModal(els.marketModal));
 els.restartButton.addEventListener("click", restartGame);
 els.sellEnergyButton?.addEventListener("click", sellSurplusEnergy);
 els.buyEnergyButton?.addEventListener("click", buyMarketEnergy);
-els.closeMarketButton?.addEventListener("click", () => closeModal(els.marketModal));
 els.openRulesButton?.addEventListener("click", () => openModal(els.rulesModal));
 els.openLogButton?.addEventListener("click", () => openModal(els.logModal));
 els.closeRulesButton?.addEventListener("click", () => closeModal(els.rulesModal));
 els.closeLogButton?.addEventListener("click", () => closeModal(els.logModal));
+els.closeMarketButton?.addEventListener("click", () => closeModal(els.marketModal));
+els.closeSparkyButton?.addEventListener("click", () => closeModal(els.sparkyModal));
+
 els.rulesModal?.addEventListener("click", (event) => {
   if (event.target === els.rulesModal) {
     closeModal(els.rulesModal);
   }
 });
+
 els.logModal?.addEventListener("click", (event) => {
   if (event.target === els.logModal) {
     closeModal(els.logModal);
   }
 });
+
 els.marketModal?.addEventListener("click", (event) => {
   if (event.target === els.marketModal) {
     closeModal(els.marketModal);
   }
 });
+
+els.sparkyModal?.addEventListener("click", (event) => {
+  if (event.target === els.sparkyModal) {
+    closeModal(els.sparkyModal);
+  }
+});
+
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     closeAllModals();
@@ -687,3 +1013,4 @@ window.addEventListener("keydown", (event) => {
 });
 
 render();
+showIntroSparkyMessage();

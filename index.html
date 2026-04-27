@@ -71,7 +71,10 @@
       <section class="fossil-strip" aria-label="Remaining fossil plants">
         <div class="fossil-top">
           <div class="round-summary card" aria-live="polite">
-            <p id="roundDemandAnnouncement" class="round-demand-announcement"></p>
+            <p
+              id="roundDemandAnnouncement"
+              class="round-demand-announcement"
+            ></p>
             <p id="roundBreakdown" class="round-breakdown"></p>
           </div>
         </div>
@@ -81,45 +84,130 @@
       </section>
     </main>
 
-    <div id="rulesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="rulesModalTitle">
+    <div
+      id="rulesModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="rulesModalTitle"
+    >
       <div class="modal-card panel">
         <div class="modal-header">
           <h2 id="rulesModalTitle">Rules Snapshot</h2>
-          <button id="closeRulesButton" class="close-button secondary" type="button" aria-label="Close rules">&times;</button>
+          <button
+            id="closeRulesButton"
+            class="close-button secondary"
+            type="button"
+            aria-label="Close rules"
+          >
+            &times;
+          </button>
         </div>
         <ul>
           <li>Demand each round: roll 1-16.</li>
           <li>Each renewable generates 1-4 power.</li>
           <li>Any remaining fossil plant can cover unmet demand in that round.</li>
           <li>Fossil fallback cost: ceil(fossil used / 2).</li>
-          <li>Income: demand - fossil cost.</li>
+          <li>Income: demand - fossil cost - any emergency market purchases.</li>
           <li>Each renewable purchase costs 24 and replaces 1 fossil.</li>
-          <li>You only blackout if renewables fall short after all fossil plants are gone.</li>
+          <li>
+            Once all fossil plants are gone, market energy can cover renewable
+            shortfalls, but emergency purchases cost more than normal. You only
+            blackout if you cannot afford enough market energy to close the
+            gap.
+          </li>
         </ul>
       </div>
     </div>
 
-    <div id="logModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="logModalTitle">
+    <div
+      id="logModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="logModalTitle"
+    >
       <div class="modal-card panel">
         <div class="modal-header">
           <h2 id="logModalTitle">Round Log</h2>
-          <button id="closeLogButton" class="close-button secondary" type="button" aria-label="Close round log">&times;</button>
+          <button
+            id="closeLogButton"
+            class="close-button secondary"
+            type="button"
+            aria-label="Close round log"
+          >
+            &times;
+          </button>
         </div>
         <ol id="logList" class="log-list"></ol>
       </div>
     </div>
 
-    <div id="marketModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="marketModalTitle">
+    <div
+      id="marketModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="marketModalTitle"
+    >
       <div class="modal-card panel">
         <div class="modal-header">
           <h2 id="marketModalTitle">Energy Market</h2>
-          <button id="closeMarketButton" class="close-button secondary" type="button" aria-label="Close market">&times;</button>
+          <button
+            id="closeMarketButton"
+            class="close-button secondary"
+            type="button"
+            aria-label="Close market"
+          >
+            &times;
+          </button>
         </div>
         <p id="marketPricesText"></p>
         <p id="marketInventoryText"></p>
         <div class="market-actions">
           <button id="sellEnergyButton" type="button">Sell Surplus</button>
           <button id="buyEnergyButton" type="button">Buy 1 Energy</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="sparkyModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="sparkyModalTitle"
+    >
+      <div class="modal-card panel sparky-card">
+        <div class="modal-header">
+          <h2 id="sparkyModalTitle">Sparky says...</h2>
+          <button
+            id="closeSparkyButton"
+            class="close-button secondary"
+            type="button"
+            aria-label="Close Sparky message"
+          >
+            &times;
+          </button>
+        </div>
+        <div class="sparky-layout">
+          <div class="sparky-figure">
+            <img
+              src="./sparky.png"
+              alt="Sparky the game mascot"
+              class="sparky-img"
+              id="sparkyImg"
+            />
+          </div>
+          <div class="sparky-bubble" id="sparkyBubble">
+            <p id="sparkyLabel" class="sparky-label" hidden>Grid tip</p>
+            <p id="sparkyText">
+              Hi I'm sparky! Welcome to the grid game. Your goal is to replace
+              all the power plants with renewable energy sources to make the
+              grid greener! But beware of blackouts! To see all the rules press
+              the ? box in the top corner. Have fun!
+            </p>
+          </div>
         </div>
       </div>
     </div>
