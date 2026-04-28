@@ -590,9 +590,7 @@ function finalizeEmergencyRound() {
     unitsPurchased,
     totalPurchaseCost
   } = state.emergencyRound;
-  const income = demand - totalPurchaseCost;
-
-  state.money += demand;
+  const income = -totalPurchaseCost;
   state.round += 1;
   state.awaitingEmergencyPurchase = false;
   state.isResolvingRound = false;
@@ -611,12 +609,12 @@ function finalizeEmergencyRound() {
             fossilUsed: 0,
             income: null
           },
-          state.money - demand
+          state.money + totalPurchaseCost
         );
       }
     },
     {
-      text: `Overall, you added ${income} money units this round and avoided a blackout.`,
+      text: `Overall, you spent ${totalPurchaseCost} money this round to avoid a blackout.`,
       onReveal: () => {
         setDisplayedRoundValues(
           {
@@ -644,7 +642,7 @@ function finalizeEmergencyRound() {
   };
 
   addLog(
-    `Round ${state.round - 1}: Emergency market bought ${unitsPurchased} unit(s) for ${totalPurchaseCost}. Income ${income >= 0 ? "+" : ""}${income}.`
+    `Round ${state.round - 1}: Emergency market bought ${unitsPurchased} unit(s) for ${totalPurchaseCost}. Income ${income}.`
   );
 
   els.statusText.textContent =
